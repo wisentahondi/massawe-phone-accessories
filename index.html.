@@ -1,157 +1,295 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Massawe Phone Accessories</title>
-    <style>
-        * {
-            box-sizing: border-box;
-        }
+from flask import Flask, request, redirect, url_for, render_template_string
+from werkzeug.utils import secure_filename
+from pathlib import Path
+import json
+import os
+import uuid
 
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f4f6f9;
-            color: #172033;
-        }
+app = Flask(__name__)
 
-        header {
-            background: #101827;
-            color: white;
-            padding: 24px 16px;
-            text-align: center;
-        }
+BASE_DIR = Path(__file__).parent
+UPLOAD_DIR = BASE_DIR / "static" / "uploads"
+DATA_FILE = BASE_DIR / "products.json"
 
-        header h1 {
-            margin: 0 0 10px;
-            font-size: 28px;
-        }
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-        nav {
-            background: #202d42;
-            padding: 14px;
-            text-align: center;
-        }
+# Change this password before using the admin panel.
+ADMIN_PASSWORD = os.environ.get("MASSAWE_ADMIN_PASSWORD", "change-me-123")
 
-        nav a {
-            color: white;
-            text-decoration: none;
-            margin: 0 12px;
-        }
+def load_products():
+    if DATA_FILE.exists():
+        try:
+            return json.loads(DATA_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return [
+        {"id": "1", "name": "Phone Covers", "price": "5000", "image": "", "description": "Phone covers"},
+        {"id": "2", "name": "Chargers", "price": "10000", "image": "", "description": "Phone chargers"},
+        {"id": "3", "name": "Earphones", "price": "7000", "image": "", "description": "Quality earphones"},
+    ]
 
-        .hero {
-            text-align: center;
-            padding: 55px 20px;
-            background: white;
-        }
+def save_products(products):
+    DATA_FILE.write_text(
+        json.dumps(products, ensure_ascii=False, indent=2),
+        encoding="utf-8"
+    )
 
-        .hero h2 {
-            font-size: 32px;
-        }
+PAGE_STYLE = """
+<style>
+* {
+    box-sizing: border-box;
+}
 
-        .hero p {
-            color: #596579;
-            line-height: 1.7;
-        }
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f7fb;
+    color: #172033;
+}
 
-        .button {
-            display: inline-block;
-            background: #087fda;
-            color: white;
-            padding: 13px 22px;
-            text-decoration: none;
-            border-radius: 7px;
-            margin-top: 12px;
-        }
+header {
+    background: #102a43;
+    color: white;
+    padding: 30px 20px;
+    text-align: center;
+}
 
-        .products {
-            padding: 35px 20px;
-            text-align: center;
-        }
+header h1 {
+    margin: 0 0 10px;
+    font-size: 30px;
+}
 
-        .product-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 18px;
-            max-width: 950px;
-            margin: 25px auto;
-        }
+nav {
+    background: #163b5c;
+    padding: 15px;
+    text-align: center;
+}
 
-        .product {
-            background: white;
-            padding: 25px 15px;
-            border-radius: 12px;
-            box-shadow: 0 3px 12px #00000010;
-        }
+nav a {
+    color: white;
+    margin: 0 12px;
+    text-decoration: none;
+    font-weight: bold;
+}
 
-        .product .emoji {
-            font-size: 45px;
-        }
+main {
+    max-width: 1100px;
+    margin: 30px auto;
+    padding: 18px;
+}
 
-        footer {
-            background: #101827;
-            color: white;
-            text-align: center;
-            padding: 22px;
-        }
-    </style>
-</head>
-<body>
+.products {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 22px;
+}
 
-    <header>
-        <h1>Massawe Phone Accessories</h1>
-        <p>Your Trusted Phone Accessories Shop</p>
-    </header>
+.card, form {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px #102a4312;
+}
 
-    <nav>
-        <a href="#home">Home</a>
-        <a href="#products">Products</a>
-        <a href="#contact">Contact</a>
-    </nav>
+.card {
+    border: 1px solid #e5eaf0;
+    transition: transform 0.2s ease;
+}
 
-    <section class="hero" id="home">
-        <h2>Accessories for Your Phone</h2>
-        <p>Discover phone cases, chargers, earphones and more.</p>
-        <a href="#products" class="button">Explore Products</a>
-    </section>
+.card:hover {
+    transform: translateY(-4px);
+}
 
-    <section class="products" id="products">
-        <h2>Our Products</h2>
+.card img {
+    width: 100%;
+    height: 200px;
+    object-fit: contain;
+    background: #f7f9fc;
+    border-radius: 10px;
+}
 
-        <div class="product-grid">
-            <div class="product">
-                <div class="emoji">📱</div>
-                <h3>Phone Cases</h3>
-                <p>Stylish cases for your phone.</p>
-            </div>
+input, textarea, button {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid #d4dce6;
+    border-radius: 8px;
+    font-size: 15px;
+}
 
-            <div class="product">
-                <div class="emoji">🔌</div>
-                <h3>Chargers</h3>
-                <p>Charging accessories for everyday use.</p>
-            </div>
+button {
+    background: #087f8c;
+    color: white;
+    border: 0;
+    cursor: pointer;
+    font-weight: bold;
+}
 
-            <div class="product">
-                <div class="emoji">🎧</div>
-                <h3>Earphones</h3>
-                <p>Enjoy your favourite music.</p>
-            </div>
+button:hover {
+    background: #066773;
+}
 
-            <div class="product">
-                <div class="emoji">🔋</div>
-                <h3>Power Banks</h3>
-                <p>Portable power for your devices.</p>
-            </div>
-        </div>
-    </section>
+.delete {
+    background: #c62828;
+}
 
-    <footer id="contact">
-        <h2>Contact Us</h2>
-        <p>Massawe Phone Accessories</p>
-        <p>Get in touch with us to learn more about our products.</p>
-        <p>&copy; 2026 Massawe Phone Accessories</p>
-    </footer>
+a {
+    color: #087f8c;
+}
 
-</body>
-</html>
+nav a {
+    color: white;
+}
+
+.price {
+    font-size: 22px;
+    font-weight: bold;
+    color: #087f8c;
+}
+
+@media (max-width: 600px) {
+    header h1 {
+        font-size: 24px;
+    }
+
+    nav a {
+        display: inline-block;
+        margin: 7px;
+    }
+
+    main {
+        padding: 12px;
+        margin: 15px auto;
+    }
+}
+</style>
+"""
+
+@app.route("/")
+def home():
+    products = load_products()
+    return render_template_string("""
+    <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+    """ + PAGE_STYLE + """</head><body>
+    <header class="hero">
+    <h1>MASSAWE PHONE ACCESSORIES</h1>
+    <p>Your Trusted Phone Accessories Shop</p>
+</header>
+    <nav><a href="/">Home</a><a href="/admin">Admin Panel</a></nav>
+    <main><h2>Our Products</h2><div class="products">
+    {% for p in products %}
+      <div class="card">
+        {% if p.image %}<img src="{{ url_for('static', filename='uploads/' + p.image) }}" alt="{{ p.name }}">
+        {% else %}<img src="https://placehold.co/300x170?text=Product+Image" alt="Product image">{% endif %}
+        <h3>{{ p.name }}</h3><p>{{ p.description }}</p>
+        <p class="price">TSh {{ p.price }}</p>
+        <a href="https://wa.me/255786977497?text={{ ('Hello, I want to order ' + p.name)|urlencode }}">Order on WhatsApp</a>
+      </div>
+    {% endfor %}
+    </div></main></body></html>
+    """, products=products)
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    if request.method == "POST":
+        if request.form.get("password") != ADMIN_PASSWORD:
+            return render_template_string("""
+            """ + PAGE_STYLE + """
+            <main><h2>Admin Login</h2><p style="color:red">Wrong password.</p>
+            <form method="post"><input type="password" name="password" placeholder="Admin password" required>
+            <button>Log in</button></form></main>"""), 401
+
+        action = request.form.get("action")
+        products = load_products()
+
+        if action == "add":
+            name = request.form.get("name", "").strip()
+            price = request.form.get("price", "").strip()
+            description = request.form.get("description", "").strip()
+            image_file = request.files.get("image")
+            image_name = ""
+
+            if name and price.isdigit():
+                if image_file and image_file.filename:
+                    ext = Path(secure_filename(image_file.filename)).suffix.lower()
+                    if ext in {".jpg", ".jpeg", ".png", ".webp"}:
+                        image_name = uuid.uuid4().hex + ext
+                        image_file.save(UPLOAD_DIR / image_name)
+
+                products.append({
+                    "id": uuid.uuid4().hex,
+                    "name": name,
+                    "price": price,
+                    "image": image_name,
+                    "description": description
+                })
+                save_products(products)
+
+        elif action == "update":
+            product_id = request.form.get("id")
+            for p in products:
+                if p["id"] == product_id:
+                    name = request.form.get("name", "").strip()
+                    price = request.form.get("price", "").strip()
+                    if name and price.isdigit():
+                        p["name"] = name
+                        p["price"] = price
+                        p["description"] = request.form.get("description", "").strip()
+                        image_file = request.files.get("image")
+                        if image_file and image_file.filename:
+                            ext = Path(secure_filename(image_file.filename)).suffix.lower()
+                            if ext in {".jpg", ".jpeg", ".png", ".webp"}:
+                                image_name = uuid.uuid4().hex + ext
+                                image_file.save(UPLOAD_DIR / image_name)
+                                p["image"] = image_name
+                    break
+            save_products(products)
+
+        elif action == "delete":
+            product_id = request.form.get("id")
+            products = [p for p in products if p["id"] != product_id]
+            save_products(products)
+
+        return redirect(url_for("admin"))
+
+    products = load_products()
+    return render_template_string("""
+    <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+    """ + PAGE_STYLE + """</head><body><header><h1>Admin Panel</h1>
+    <p>Massawe Phone Accessories</p></header><main>
+    <h2>Log in</h2>
+    <form method="post"><input type="password" name="password" placeholder="Admin password" required>
+    <button>Open Admin Panel</button></form>
+    <p>Default password: <b>change-me-123</b>. Change it before using this site beyond your own computer.</p>
+    <hr><h2>Add a product</h2>
+    <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="password" value="change-me-123">
+    <input type="hidden" name="action" value="add">
+    <input name="name" placeholder="Product name" required>
+    <input name="price" type="number" min="0" placeholder="Price in TSh" required>
+    <textarea name="description" placeholder="Description"></textarea>
+    <label>Product photo (JPG, PNG or WEBP)</label><input type="file" name="image" accept=".jpg,.jpeg,.png,.webp">
+    <button>Add product</button></form>
+    <h2>Edit or delete products</h2>
+    {% for p in products %}
+    <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="password" value="change-me-123">
+    <input type="hidden" name="id" value="{{ p.id }}">
+    <input type="hidden" name="action" value="update">
+    <input name="name" value="{{ p.name }}" required>
+    <input name="price" type="number" min="0" value="{{ p.price }}" required>
+    <textarea name="description">{{ p.description }}</textarea>
+    <label>Replace photo (optional)</label><input type="file" name="image" accept=".jpg,.jpeg,.png,.webp">
+    <button>Save changes</button></form>
+    <form method="post" onsubmit="return confirm('Delete this product?')">
+    <input type="hidden" name="password" value="change-me-123">
+    <input type="hidden" name="id" value="{{ p.id }}">
+    <input type="hidden" name="action" value="delete">
+    <button class="delete">Delete {{ p.name }}</button></form>
+    {% endfor %}
+    <p><a href="/">View website</a></p></main></body></html>
+    """, products=products)
+
+if __name__ == "__main__":
+    save_products(load_products())
+    app.run(debug=False, host="127.0.0.1", port=5000)
